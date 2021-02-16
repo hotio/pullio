@@ -5,6 +5,13 @@ DOCKER_BINARY="$(which docker)"
 CACHE_LOCATION=/tmp
 DEBUG="$1"
 
+if which logger; then
+    exec 1> >(logger -s -t "$(basename "$0")[$$]") 2>&1
+fi
+
+[[ -f "$CACHE_LOCATION/$(basename "$0").lock" ]] && exit 0
+touch "$CACHE_LOCATION/$(basename "$0").lock"
+
 compose_pull_wrapper() {
     if [[ -z ${COMPOSE_BINARY} ]]; then
         "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
@@ -121,3 +128,5 @@ for i in "${!containers[@]}"; do
         fi
     fi
 done
+
+rm "$CACHE_LOCATION/$(basename "$0").lock"
