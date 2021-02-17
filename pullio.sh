@@ -5,7 +5,7 @@ DOCKER_BINARY="$(which docker)"
 CACHE_LOCATION=/tmp
 DEBUG="$1"
 
-if which logger; then
+if which logger > /dev/null; then
     exec 1> >(logger -s -t "$(basename "$0")[$$]") 2>&1
 fi
 
