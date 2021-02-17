@@ -44,7 +44,7 @@ compose_up_wrapper() {
     fi
 }
 
-send_notification() {
+send_discord_notification() {
     extra=""
     if [[ -n $3 ]] && [[ -n $4 ]] && [[ -n $7 ]] && [[ -n $8 ]]; then
         old_version="$3" && [[ ${#3} -gt 33 ]] && old_version="${3:0:30}..."
@@ -116,37 +116,57 @@ for i in "${!containers[@]}"; do
     pullio_registry_authfile=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.registry.authfile" }}' "$container_name")
 
     if [[ ( -n $docker_compose_version ) && ( $pullio_update == true || $pullio_notify == true ) ]]; then
-        [[ -f $pullio_registry_authfile ]] && jq -r .password < "$pullio_registry_authfile" | "${DOCKER_BINARY}" login --username "$(jq -r .username < "$pullio_registry_authfile")" --password-stdin "$(jq -r .registry < "$pullio_registry_authfile")"
+        if [[ -f $pullio_registry_authfile ]]; then
+            echo "$container_name: Registry login..."
+            jq -r .password < "$pullio_registry_authfile" | "${DOCKER_BINARY}" login --username "$(jq -r .username < "$pullio_registry_authfile")" --password-stdin "$(jq -r .registry < "$pullio_registry_authfile")" > /dev/null
+        fi
 
-        compose_pull_wrapper "$docker_compose_workdir" "${container_name}"
+        echo "$container_name: Pulling image..."
+        if ! compose_pull_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
+            echo "$container_name: Pulling failed!"
+        fi
 
         image_digest=${DEBUG}$("${DOCKER_BINARY}" image inspect --format='{{.Id}}' "${image_name}")
         new_opencontainers_image_version=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image_name")
         new_opencontainers_image_revision=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_name")
 
-        if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_notify == true ]] && [[ $pullio_update != true ]]; then
+        status="Update available"
+        color=768753
+        if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_update == true ]]; then
+            if [[ -n "${pullio_script_update[*]}" ]]; then
+                echo "$container_name: Stopping container..."
+                "${DOCKER_BINARY}" stop "${container_name}" > /dev/null
+                echo "$container_name: Executing update script..."
+                "${pullio_script_update[@]}"
+            fi
+            echo "$container_name: Updating container..."
+            if compose_up_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
+                status="Updated container"
+                color=3066993
+            else
+                echo "$container_name: Updating container failed!"
+                status="Updating container failed!"
+                color=15158332
+            fi
+            rm -f "$CACHE_LOCATION/$sum-$container_name.notified"
+        fi
+
+        if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_notify == true ]]; then
             touch "$CACHE_LOCATION/$sum-$container_name.notified"
             notified_digest=$(cat "$CACHE_LOCATION/$sum-$container_name.notified")
             if [[ $notified_digest != "$image_digest" ]]; then
-                echo "$container_name: Update available"
-                [[ -n "${pullio_script_notify[*]}" ]] && echo "$container_name: Executing notify script" && "${pullio_script_notify[@]}"
-                send_notification "Update available" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}"
-                echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
-            fi
-        fi
-
-        if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_update == true ]]; then
-            [[ -n "${pullio_script_update[*]}" ]] && "${DOCKER_BINARY}" stop "${container_name}" && echo "$container_name: Executing update script" && "${pullio_script_update[@]}"
-            if compose_up_wrapper "$docker_compose_workdir" "${container_name}"; then
-                if [[ $pullio_notify == true ]]; then
-                    echo "$container_name: Update completed"
-                    send_notification "Updated container" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" 3066993
+                if [[ -n "${pullio_script_notify[*]}" ]]; then
+                    echo "$container_name: Executing notify script..."
+                    "${pullio_script_notify[@]}"
                 fi
-            else
-                send_notification "Updating container failed!" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" 15158332
+                if [[ -n "$pullio_discord_webhook" ]]; then
+                    echo "$container_name: Sending discord notification..."
+                    send_discord_notification "$status" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "$color"
+                    echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
+                fi
             fi
         fi
     fi
 done
 
-"${DOCKER_BINARY}" image prune --force
+"${DOCKER_BINARY}" image prune --force > /dev/null
