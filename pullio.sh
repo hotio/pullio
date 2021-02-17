@@ -117,7 +117,6 @@ for i in "${!containers[@]}"; do
         if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_update == true ]]; then
             [[ -n "${pullio_script_update[*]}" ]] && "${DOCKER_BINARY}" stop "${container_name}" && echo "$container_name: Executing update script" && "${pullio_script_update[@]}"
             if compose_up_wrapper "$docker_compose_workdir" "${container_name}"; then
-                "${DOCKER_BINARY}" image prune --force
                 if [[ $pullio_notify == true ]]; then
                     echo "$container_name: Update completed"
                     send_notification "Updated container" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" 3066993
@@ -128,5 +127,7 @@ for i in "${!containers[@]}"; do
         fi
     fi
 done
+
+"${DOCKER_BINARY}" image prune --force
 
 rm "$CACHE_LOCATION/$(basename "$0").lock"
