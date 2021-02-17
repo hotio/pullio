@@ -37,10 +37,10 @@ compose_pull_wrapper() {
 
 compose_up_wrapper() {
     if [[ -z ${COMPOSE_BINARY} ]]; then
-        "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d "$2"
+        "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
     else
         cd "$1" || exit 1
-        "${COMPOSE_BINARY}" up -d "$2"
+        "${COMPOSE_BINARY}" up -d --always-recreate-deps "$2"
     fi
 }
 
