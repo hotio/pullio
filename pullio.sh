@@ -33,23 +33,26 @@ compose_up_wrapper() {
 send_notification() {
     extra=""
     if [[ -n $3 ]] && [[ -n $4 ]] && [[ -n $7 ]] && [[ -n $8 ]]; then
-        v_ind="" && [[ $3 != "$4" ]] && v_ind=" *"
-        rev_ind="" && [[ $7 != "$8" ]] && rev_ind=" *"
+        old_version="$3" && [[ ${#3} -gt 33 ]] && old_version="${3:0:30}..."
+        new_version="$4" && [[ ${#4} -gt 33 ]] && new_version="${4:0:30}..."
+        v_ind=">" && [[ ${3} == "${4}" ]] && v_ind="="
+        r_ind=">" && [[ ${7} == "${8}" ]] && r_ind="="
         extra=',
             {
-            "name": "Version'$v_ind'",
-            "value": "```\nold: '${3:----}'\nnew: '${4:----}'```"
+            "name": "Version",
+            "value": "```\n'${old_version}'\n ='$v_ind' '${new_version}'```"
             },
             {
-            "name": "Revision'$rev_ind'",
-            "value": "```\nold: '${7:----}'\nnew: '${8:----}'```"
+            "name": "Revision",
+            "value": "```\n'${7:0:30}'...\n ='$r_ind' '${8:0:30}'...```"
             }'
     fi
+    d_ind=">" && [[ ${9} == "${10}" ]] && d_ind="="
     json='{
     "embeds": [
         {
         "title": "'${1}'",
-        "color": '${9:-768753}',
+        "color": '${11:-768753}',
         "fields": [
             {
             "name": "Container",
@@ -58,6 +61,10 @@ send_notification() {
             {
             "name": "Image",
             "value": "```'${5}'```"
+            },
+            {
+            "name": "Digest",
+            "value": "```\n'${9:0:30}'...\n ='$d_ind' '${10:0:30}'...```"
             }'$extra'
         ],
         "footer": {
@@ -109,7 +116,7 @@ for i in "${!containers[@]}"; do
             if [[ $notified_digest != "$image_digest" ]]; then
                 echo "$container_name: Update available"
                 [[ -n "${pullio_script_notify[*]}" ]] && echo "$container_name: Executing notify script" && "${pullio_script_notify[@]}"
-                send_notification "Update available" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision"
+                send_notification "Update available" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}"
                 echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
             fi
         fi
@@ -119,10 +126,10 @@ for i in "${!containers[@]}"; do
             if compose_up_wrapper "$docker_compose_workdir" "${container_name}"; then
                 if [[ $pullio_notify == true ]]; then
                     echo "$container_name: Update completed"
-                    send_notification "Updated container" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" 3066993
+                    send_notification "Updated container" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" 3066993
                 fi
             else
-                send_notification "Updating container failed!" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" 15158332
+                send_notification "Updating container failed!" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" 15158332
             fi
         fi
     fi
