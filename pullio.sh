@@ -3,7 +3,28 @@
 COMPOSE_BINARY="$(which docker-compose)"
 DOCKER_BINARY="$(which docker)"
 CACHE_LOCATION=/tmp
-DEBUG="$1"
+TAG=""
+DEBUG=""
+
+while [ "$1" != "" ]; do
+    PARAM=$(printf "%s\n" $1 | awk -F= '{print $1}')
+    VALUE=$(printf "%s\n" $1 | sed 's/^[^=]*=//g')
+    if [[ $VALUE == "$PARAM" ]]; then
+        shift
+        VALUE=$1
+    fi
+    case $PARAM in
+        --tag)
+            [[ -n $VALUE ]] && [[ $VALUE != "--"* ]] && TAG=".$VALUE"
+            ;;
+        --debug)
+            [[ -n $VALUE ]] && [[ $VALUE != "--"* ]] && DEBUG="$VALUE"
+            ;;
+    esac
+    shift
+done
+
+echo "Running with \"DEBUG=$DEBUG\" and \"TAG=$TAG\"."
 
 compose_pull_wrapper() {
     if [[ -z ${COMPOSE_BINARY} ]]; then
@@ -87,12 +108,12 @@ for i in "${!containers[@]}"; do
     old_opencontainers_image_version=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.opencontainers.image.version" }}' "$container_name")
     old_opencontainers_image_revision=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$container_name")
 
-    pullio_update=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio.update" }}' "$container_name")
-    pullio_notify=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio.notify" }}' "$container_name")
-    pullio_discord_webhook=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio.discord.webhook" }}' "$container_name")
-    pullio_script_update=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio.script.update" }}' "$container_name"))
-    pullio_script_notify=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio.script.notify" }}' "$container_name"))
-    pullio_registry_authfile=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio.registry.authfile" }}' "$container_name")
+    pullio_update=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.update" }}' "$container_name")
+    pullio_notify=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.notify" }}' "$container_name")
+    pullio_discord_webhook=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.discord.webhook" }}' "$container_name")
+    pullio_script_update=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.script.update" }}' "$container_name"))
+    pullio_script_notify=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.script.notify" }}' "$container_name"))
+    pullio_registry_authfile=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.registry.authfile" }}' "$container_name")
 
     if [[ ( -n $docker_compose_version ) && ( $pullio_update == true || $pullio_notify == true ) ]]; then
         [[ -f $pullio_registry_authfile ]] && jq -r .password < "$pullio_registry_authfile" | "${DOCKER_BINARY}" login --username "$(jq -r .username < "$pullio_registry_authfile")" --password-stdin "$(jq -r .registry < "$pullio_registry_authfile")"
