@@ -62,16 +62,13 @@ send_discord_notification() {
             }'
     fi
     d_ind=">" && [[ ${9} == "${10}" ]] && d_ind="="
+    author_url="${12}" && [[ -z ${12} ]] && author_url="https://github.com/hotio/pullio/raw/master/pullio.png"
     json='{
     "embeds": [
         {
-        "title": "'${1}'",
+        "description": "'${1}'",
         "color": '${11:-768753}',
         "fields": [
-            {
-            "name": "Container",
-            "value": "```'${2}'```"
-            },
             {
             "name": "Image",
             "value": "```'${5}'```"
@@ -81,6 +78,10 @@ send_discord_notification() {
             "value": "```\n'${9:0:30}'...\n ='$d_ind' '${10:0:30}'...```"
             }'$extra'
         ],
+        "author": {
+            "name": "'${2}'",
+            "icon_url": "'${author_url}'"
+        },
         "footer": {
             "text": "Powered by Pullio"
         },
@@ -116,6 +117,7 @@ for i in "${!containers[@]}"; do
     pullio_script_update=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.script.update" }}' "$container_name"))
     pullio_script_notify=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.script.notify" }}' "$container_name"))
     pullio_registry_authfile=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.registry.authfile" }}' "$container_name")
+    pullio_author_avatar=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.author.avatar" }}' "$container_name")
 
     if [[ ( -n $docker_compose_version ) && ( $pullio_update == true || $pullio_notify == true ) ]]; then
         if [[ -f $pullio_registry_authfile ]]; then
@@ -132,7 +134,7 @@ for i in "${!containers[@]}"; do
         new_opencontainers_image_version=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image_name")
         new_opencontainers_image_revision=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_name")
 
-        status="Update available"
+        status="Hey, there's an update available for me, you can make me all shiny and new again if you want."
         color=768753
         if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_update == true ]]; then
             if [[ -n "${pullio_script_update[*]}" ]]; then
@@ -143,11 +145,11 @@ for i in "${!containers[@]}"; do
             fi
             echo "$container_name: Updating container..."
             if compose_up_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
-                status="Updated container"
+                status="So I just updated myself, great success! Feel brand new again."
                 color=3066993
             else
                 echo "$container_name: Updating container failed!"
-                status="Updating container failed!"
+                status="Don't be mad. I just tried updating myself, but I failed! Help?"
                 color=15158332
             fi
             rm -f "$CACHE_LOCATION/$sum-$container_name.notified"
@@ -163,7 +165,7 @@ for i in "${!containers[@]}"; do
                 fi
                 if [[ -n "$pullio_discord_webhook" ]]; then
                     echo "$container_name: Sending discord notification..."
-                    send_discord_notification "$status" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "$color"
+                    send_discord_notification "$status" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "$color" "$pullio_author_avatar"
                     echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
                 fi
             fi
