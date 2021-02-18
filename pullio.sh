@@ -86,7 +86,9 @@ send_discord_notification() {
         },
         "timestamp": "'$(date -u +'%FT%T.%3NZ')'"
         }
-    ]
+    ],
+    "username": "Pullio",
+    "avatar_url": "https://github.com/hotio/pullio/raw/master/pullio.png"
     }'
     curl -fsSL -H "Content-Type: multipart/form-data" -F "payload_json=${json}" "${6}"
 }
