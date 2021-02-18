@@ -47,18 +47,16 @@ compose_up_wrapper() {
 send_discord_notification() {
     extra=""
     if [[ -n $3 ]] && [[ -n $4 ]] && [[ -n $7 ]] && [[ -n $8 ]]; then
-        old_version="$3" && [[ ${#3} -gt 33 ]] && old_version="${3:0:30}..."
-        new_version="$4" && [[ ${#4} -gt 33 ]] && new_version="${4:0:30}..."
         v_ind=">" && [[ ${3} == "${4}" ]] && v_ind="="
         r_ind=">" && [[ ${7} == "${8}" ]] && r_ind="="
         extra=',
             {
             "name": "Version",
-            "value": "```\n'${old_version}'\n ='$v_ind' '${new_version}'```"
+            "value": "```\n'${3}'\n ='$v_ind' '${4}'```"
             },
             {
-            "name": "Revision",
-            "value": "```\n'${7:0:30}'...\n ='$r_ind' '${8:0:30}'...```"
+            "name": "Revision (Git SHA)",
+            "value": "```\n'${7:0:6}'\n ='$r_ind' '${8:0:6}'```"
             }'
     fi
     d_ind=">" && [[ ${9} == "${10}" ]] && d_ind="="
@@ -74,8 +72,8 @@ send_discord_notification() {
             "value": "```'${5}'```"
             },
             {
-            "name": "Digest",
-            "value": "```\n'${9:0:30}'...\n ='$d_ind' '${10:0:30}'...```"
+            "name": "Image ID",
+            "value": "```\n'${9:0:11}'\n ='$d_ind' '${10:0:11}'```"
             }'$extra'
         ],
         "author": {
