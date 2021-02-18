@@ -134,7 +134,7 @@ for i in "${!containers[@]}"; do
         new_opencontainers_image_version=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.version" }}' "$image_name")
         new_opencontainers_image_revision=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_name")
 
-        status="Hey, there's an update available for me, you can make me all shiny and new again if you want."
+        status="I've got an update waiting for me.\nGive it to me, please."
         color=768753
         if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_update == true ]]; then
             if [[ -n "${pullio_script_update[*]}" ]]; then
@@ -145,11 +145,11 @@ for i in "${!containers[@]}"; do
             fi
             echo "$container_name: Updating container..."
             if compose_up_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
-                status="So I just updated myself, great success! Feel brand new again."
+                status="I just updated myself.\nFeeling brand spanking new again!"
                 color=3066993
             else
                 echo "$container_name: Updating container failed!"
-                status="Don't be mad. I just tried updating myself, but I failed! Help?"
+                status="I tried to update myself.\nIt didn't work out, I might need some help."
                 color=15158332
             fi
             rm -f "$CACHE_LOCATION/$sum-$container_name.notified"
