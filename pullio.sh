@@ -89,7 +89,7 @@ send_discord_notification() {
     "username": "Pullio",
     "avatar_url": "https://github.com/hotio/pullio/raw/master/pullio.png"
     }'
-    curl -fsSL -H "Content-Type: multipart/form-data" -F "payload_json=${json}" "${6}"
+    curl -fsSL -H "User-Agent: Pullio" -H "Content-Type: application/json" -d "${json}" "${6}" > /dev/null
 }
 
 send_generic_webhook() {
@@ -106,7 +106,7 @@ send_generic_webhook() {
     "type": "'${1}'",
     "timestamp": "'$(date -u +'%FT%T.%3NZ')'"
     }'
-    curl -fsSL -H "User-Agent: Pullio" -H "Content-Type: multipart/form-data" -F "payload_json=${json}" "${6}" > /dev/null
+    curl -fsSL -H "User-Agent: Pullio" -H "Content-Type: application/json" -d "${json}" "${6}" > /dev/null
 }
 
 sum="$(sha1sum "$0" | awk '{print $1}')"
