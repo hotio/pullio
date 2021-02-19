@@ -92,6 +92,23 @@ send_discord_notification() {
     curl -fsSL -H "Content-Type: multipart/form-data" -F "payload_json=${json}" "${6}"
 }
 
+send_generic_webhook() {
+    json='{
+    "container": "'${2}'",
+    "image": "'${5}'",
+    "avatar": "'${11}'",
+    "old_image_id": "'${9}'",
+    "new_image_id": "'${10}'",
+    "old_version": "'${3}'",
+    "new_version": "'${4}'",
+    "old_revision": "'${7}'",
+    "new_revision": "'${8}'",
+    "type": "'${1}'",
+    "timestamp": "'$(date -u +'%FT%T.%3NZ')'"
+    }'
+    curl -fsSL -H "User-Agent: Pullio" -H "Content-Type: multipart/form-data" -F "payload_json=${json}" "${6}" > /dev/null
+}
+
 sum="$(sha1sum "$0" | awk '{print $1}')"
 
 mapfile -t containers < <("${DOCKER_BINARY}" ps --format '{{.Names}}' | sort -k1 | awk '{ print $1 }')
@@ -112,6 +129,7 @@ for i in "${!containers[@]}"; do
     pullio_update=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.update" }}' "$container_name")
     pullio_notify=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.notify" }}' "$container_name")
     pullio_discord_webhook=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.discord.webhook" }}' "$container_name")
+    pullio_generic_webhook=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.generic.webhook" }}' "$container_name")
     pullio_script_update=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.script.update" }}' "$container_name"))
     pullio_script_notify=($("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.script.notify" }}' "$container_name"))
     pullio_registry_authfile=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.registry.authfile" }}' "$container_name")
@@ -133,6 +151,7 @@ for i in "${!containers[@]}"; do
         new_opencontainers_image_revision=$("${DOCKER_BINARY}" image inspect --format='{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_name")
 
         status="I've got an update waiting for me.\nGive it to me, please."
+        status_generic="update_available"
         color=768753
         if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_update == true ]]; then
             if [[ -n "${pullio_script_update[*]}" ]]; then
@@ -144,10 +163,12 @@ for i in "${!containers[@]}"; do
             echo "$container_name: Updating container..."
             if compose_up_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
                 status="I just updated myself.\nFeeling brand spanking new again!"
+                status_generic="update_success"
                 color=3066993
             else
                 echo "$container_name: Updating container failed!"
                 status="I tried to update myself.\nIt didn't work out, I might need some help."
+                status_generic="update_failure"
                 color=15158332
             fi
             rm -f "$CACHE_LOCATION/$sum-$container_name.notified"
@@ -164,8 +185,12 @@ for i in "${!containers[@]}"; do
                 if [[ -n "$pullio_discord_webhook" ]]; then
                     echo "$container_name: Sending discord notification..."
                     send_discord_notification "$status" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_discord_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "$color" "$pullio_author_avatar"
-                    echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
                 fi
+                if [[ -n "$pullio_generic_webhook" ]]; then
+                    echo "$container_name: Sending generic webhook..."
+                    send_generic_webhook "$status_generic" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_generic_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "$pullio_author_avatar"
+                fi
+                echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
             fi
         fi
     fi
