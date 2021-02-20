@@ -120,6 +120,7 @@ for i in "${!containers[@]}"; do
     image_name=$("${DOCKER_BINARY}" inspect --format='{{.Config.Image}}' "$container_name")
     container_image_digest=$("${DOCKER_BINARY}" inspect --format='{{.Image}}' "$container_name")
 
+    docker_compose_service=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "com.docker.compose.service" }}' "$container_name")
     docker_compose_version=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "com.docker.compose.version" }}' "$container_name")
     docker_compose_workdir=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$container_name")
 
@@ -142,7 +143,7 @@ for i in "${!containers[@]}"; do
         fi
 
         echo "$container_name: Pulling image..."
-        if ! compose_pull_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
+        if ! compose_pull_wrapper "$docker_compose_workdir" "${docker_compose_service}" > /dev/null 2>&1; then
             echo "$container_name: Pulling failed!"
         fi
 
@@ -161,7 +162,7 @@ for i in "${!containers[@]}"; do
                 "${pullio_script_update[@]}"
             fi
             echo "$container_name: Updating container..."
-            if compose_up_wrapper "$docker_compose_workdir" "${container_name}" > /dev/null 2>&1; then
+            if compose_up_wrapper "$docker_compose_workdir" "${docker_compose_service}" > /dev/null 2>&1; then
                 status="I just updated myself.\nFeeling brand spanking new again!"
                 status_generic="update_success"
                 color=3066993
