@@ -1,3 +1,1 @@
-Visit [hotio.dev](https://hotio.dev/pullio) for documentation.
-
-Icon by <a href="https://freeicons.io/profile/6200">Soni Sokell</a> on <a href="https://freeicons.io">freeicons.io</a>
+![visit me](https://hotio.dev/img/visit-me.png "Visit https://hotio.dev or click me!")
