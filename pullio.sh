@@ -109,6 +109,20 @@ send_generic_webhook() {
     curl -fsSL -H "User-Agent: Pullio" -H "Content-Type: application/json" -d "${json}" "${6}" > /dev/null
 }
 
+export_env_vars() {
+    export PULLIO_CONTAINER=${1}
+    export PULLIO_IMAGE=${2}
+    export PULLIO_AVATAR=${3}
+    export PULLIO_OLD_IMAGE_ID=${4}
+    export PULLIO_NEW_IMAGE_ID=${5}
+    export PULLIO_OLD_VERSION=${6}
+    export PULLIO_NEW_VERSION=${7}
+    export PULLIO_OLD_REVISION=${8}
+    export PULLIO_NEW_REVISION=${9}
+    export PULLIO_COMPOSE_SERVICE=${10}
+    export PULLIO_COMPOSE_WORKDIR=${11}
+}
+
 sum="$(sha1sum "$0" | awk '{print $1}')"
 
 mapfile -t containers < <("${DOCKER_BINARY}" ps --format '{{.Names}}' | sort -k1 | awk '{ print $1 }')
@@ -159,6 +173,7 @@ for i in "${!containers[@]}"; do
                 echo "$container_name: Stopping container..."
                 "${DOCKER_BINARY}" stop "${container_name}" > /dev/null
                 echo "$container_name: Executing update script..."
+                export_env_vars "$container_name" "${image_name}" "${pullio_author_avatar}" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "${old_opencontainers_image_version}" "${new_opencontainers_image_version}" "${old_opencontainers_image_revision}" "${new_opencontainers_image_revision}" "${docker_compose_service}" "${docker_compose_workdir}"
                 "${pullio_script_update[@]}"
             fi
             echo "$container_name: Updating container..."
@@ -181,6 +196,7 @@ for i in "${!containers[@]}"; do
             if [[ $notified_digest != "$image_digest" ]]; then
                 if [[ -n "${pullio_script_notify[*]}" ]]; then
                     echo "$container_name: Executing notify script..."
+                    export_env_vars "$container_name" "${image_name}" "${pullio_author_avatar}" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "${old_opencontainers_image_version}" "${new_opencontainers_image_version}" "${old_opencontainers_image_revision}" "${new_opencontainers_image_revision}" "${docker_compose_service}" "${docker_compose_workdir}"
                     "${pullio_script_notify[@]}"
                 fi
                 if [[ -n "$pullio_discord_webhook" ]]; then
