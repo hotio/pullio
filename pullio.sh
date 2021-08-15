@@ -18,7 +18,7 @@ while [ "$1" != "" ]; do
             [[ -n $VALUE ]] && [[ $VALUE != "--"* ]] && TAG=".$VALUE"
             ;;
         --debug)
-            [[ -n $VALUE ]] && [[ $VALUE != "--"* ]] && DEBUG="$VALUE"
+            [[ $VALUE != "--"* ]] && DEBUG="${VALUE:-debug}"
             ;;
     esac
     shift
