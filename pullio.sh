@@ -213,4 +213,5 @@ for i in "${!containers[@]}"; do
     fi
 done
 
+echo "Pruning docker images..."
 "${DOCKER_BINARY}" image prune --force
