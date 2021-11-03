@@ -105,7 +105,7 @@ send_generic_webhook() {
     "old_revision": "'${7}'",
     "new_revision": "'${8}'",
     "type": "'${1}'",
-    "url": "'${13}'",
+    "url": "'${12}'",
     "timestamp": "'$(date -u +'%FT%T.%3NZ')'"
     }'
     curl -fsSL -H "User-Agent: Pullio" -H "Content-Type: application/json" -d "${json}" "${6}"
