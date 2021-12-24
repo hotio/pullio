@@ -5,6 +5,8 @@ DOCKER_BINARY="$(which docker)"
 CACHE_LOCATION=/tmp
 TAG=""
 DEBUG=""
+CURRENT_VERSION=0.0.2
+LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/hotio/pullio/releases" | jq -r .[0].tag_name)
 
 while [ "$1" != "" ]; do
     PARAM=$(printf "%s\n" $1 | awk -F= '{print $1}')
@@ -25,6 +27,8 @@ while [ "$1" != "" ]; do
 done
 
 echo "Running with \"DEBUG=$DEBUG\" and \"TAG=$TAG\"."
+echo "Current version: ${CURRENT_VERSION}"
+echo "Latest version: ${LATEST_VERSION}"
 
 compose_pull_wrapper() {
     if [[ -z ${COMPOSE_BINARY} ]]; then
@@ -45,6 +49,11 @@ compose_up_wrapper() {
 }
 
 send_discord_notification() {
+    if [[ "${LATEST_VERSION}" != "${CURRENT_VERSION}" ]]; then
+        footer_text="Powered by Pullio (update available)"
+    else
+        footer_text="Powered by Pullio"
+    fi
     extra=""
     if [[ -n $3 ]] && [[ -n $4 ]] && [[ -n $7 ]] && [[ -n $8 ]]; then
         v_ind=">" && [[ ${3} == "${4}" ]] && v_ind="="
@@ -82,7 +91,7 @@ send_discord_notification() {
             "icon_url": "'${author_url}'"
         },
         "footer": {
-            "text": "Powered by Pullio"
+            "text": "'${footer_text}'"
         },
         "timestamp": "'$(date -u +'%FT%T.%3NZ')'"
         }
