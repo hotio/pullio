@@ -1,7 +1,7 @@
 #!/bin/bash
 
-COMPOSE_BINARY="$(which docker-compose)"
-DOCKER_BINARY="$(which docker)"
+COMPOSE_BINARY="${COMPOSE_BINARY:-$(which 'docker-compose')}"
+DOCKER_BINARY="${DOCKER_BINARY:-$(which 'docker')}"
 CACHE_LOCATION=/tmp
 TAG=""
 DEBUG=""
