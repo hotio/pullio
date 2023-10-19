@@ -5,8 +5,16 @@ DOCKER_BINARY="${DOCKER_BINARY:-$(which 'docker')}"
 CACHE_LOCATION=/tmp
 TAG=""
 DEBUG=""
-CURRENT_VERSION=0.0.4
+CURRENT_VERSION=0.0.5
 LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/hotio/pullio/releases" | jq -r .[0].tag_name)
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Using docker-compose V1"
+  COMPOSE_V2="0"
+else
+  echo "Using docker compose V2"
+  COMPOSE_V2="1"
+fi
 
 while [ "$1" != "" ]; do
     PARAM=$(printf "%s\n" $1 | awk -F= '{print $1}')
@@ -32,21 +40,38 @@ echo "Latest version: ${LATEST_VERSION}"
 
 compose_pull_wrapper() {
     if [[ -z ${COMPOSE_BINARY} ]]; then
-        "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
+        if [[ "${COMPOSE_V2}" == "1" ]]; then
+            "${DOCKER_BINARY}" compose pull "$2"
+        else
+            "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
+        fi
     else
         cd "$1" || exit 1
-        "${COMPOSE_BINARY}" pull "$2"
+        if [[ "${COMPOSE_V2}" == "1" ]]; then
+            "${DOCKER_BINARY}" compose pull "$2"
+        else
+            "${COMPOSE_BINARY}" pull "$2"
+        fi
     fi
 }
 
 compose_up_wrapper() {
     if [[ -z ${COMPOSE_BINARY} ]]; then
-        "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
+        if [[ "${COMPOSE_V2}" == "1" ]]; then
+            "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
+        else
+            "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
+        fi
     else
         cd "$1" || exit 1
-        "${COMPOSE_BINARY}" up -d --always-recreate-deps "$2"
+        if [[ "${COMPOSE_V2}" == "1" ]]; then
+            "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
+        else
+            "${COMPOSE_BINARY}" up -d --always-recreate-deps "$2"
+        fi
     fi
 }
+
 
 send_discord_notification() {
     if [[ "${LATEST_VERSION}" != "${CURRENT_VERSION}" ]]; then
