@@ -39,6 +39,7 @@ echo "Current version: ${CURRENT_VERSION}"
 echo "Latest version: ${LATEST_VERSION}"
 
 compose_pull_wrapper() {
+    cd "$1" || exit 1
     if [[ -z ${COMPOSE_BINARY} ]]; then
         if [[ "${COMPOSE_V2}" == "1" ]]; then
             "${DOCKER_BINARY}" compose pull "$2"
@@ -46,7 +47,6 @@ compose_pull_wrapper() {
             "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
         fi
     else
-        cd "$1" || exit 1
         if [[ "${COMPOSE_V2}" == "1" ]]; then
             "${DOCKER_BINARY}" compose pull "$2"
         else
@@ -56,6 +56,7 @@ compose_pull_wrapper() {
 }
 
 compose_up_wrapper() {
+    cd "$1" || exit 1
     if [[ -z ${COMPOSE_BINARY} ]]; then
         if [[ "${COMPOSE_V2}" == "1" ]]; then
             "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
@@ -63,7 +64,6 @@ compose_up_wrapper() {
             "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
         fi
     else
-        cd "$1" || exit 1
         if [[ "${COMPOSE_V2}" == "1" ]]; then
             "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
         else
