@@ -5,7 +5,7 @@ DOCKER_BINARY="${DOCKER_BINARY:-$(which 'docker')}"
 CACHE_LOCATION=/tmp
 TAG=""
 DEBUG=""
-CURRENT_VERSION=0.0.5
+CURRENT_VERSION=0.0.6
 LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/hotio/pullio/releases" | jq -r .[0].tag_name)
 
 if ! docker compose version >/dev/null 2>&1; then
