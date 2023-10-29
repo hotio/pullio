@@ -8,12 +8,13 @@ DEBUG=""
 CURRENT_VERSION=0.0.6
 LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/hotio/pullio/releases" | jq -r .[0].tag_name)
 
-if ! docker compose version >/dev/null 2>&1; then
-  echo "Using docker-compose V1"
-  COMPOSE_V2="0"
-else
-  echo "Using docker compose V2"
-  COMPOSE_V2="1"
+COMPOSE_TYPE="NONE"
+# Check for V1
+if [[ -n "${COMPOSE_BINARY}" ]]; then
+    COMPOSE_TYPE="V1"
+# If V1 is not found, check for V2
+elif [[ -n "${DOCKER_BINARY}" ]] && docker compose version &>/dev/null; then
+    COMPOSE_TYPE="V2"
 fi
 
 while [ "$1" != "" ]; do
@@ -40,36 +41,42 @@ echo "Latest version: ${LATEST_VERSION}"
 
 compose_pull_wrapper() {
     cd "$1" || exit 1
-    if [[ -z ${COMPOSE_BINARY} ]]; then
-        if [[ "${COMPOSE_V2}" == "1" ]]; then
-            "${DOCKER_BINARY}" compose pull "$2"
-        else
-            "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
-        fi
-    else
-        if [[ "${COMPOSE_V2}" == "1" ]]; then
-            "${DOCKER_BINARY}" compose pull "$2"
-        else
+    case $COMPOSE_TYPE in
+        "V1")
             "${COMPOSE_BINARY}" pull "$2"
-        fi
-    fi
+            ;;
+        "V2")
+            "${DOCKER_BINARY}" compose pull "$2"
+            ;;
+        "NONE")
+            if [[ -n "${DOCKER_BINARY}" ]]; then
+                "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
+            else
+                echo "Error: Neither Docker Compose nor Docker binary is available. Cannot pull." >&2
+                return 1
+            fi
+            ;;
+    esac
 }
 
 compose_up_wrapper() {
     cd "$1" || exit 1
-    if [[ -z ${COMPOSE_BINARY} ]]; then
-        if [[ "${COMPOSE_V2}" == "1" ]]; then
-            "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
-        else
-            "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
-        fi
-    else
-        if [[ "${COMPOSE_V2}" == "1" ]]; then
-            "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
-        else
+    case $COMPOSE_TYPE in
+        "V1")
             "${COMPOSE_BINARY}" up -d --always-recreate-deps "$2"
-        fi
-    fi
+            ;;
+        "V2")
+            "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
+            ;;
+        "NONE")
+            if [[ -n "${DOCKER_BINARY}" ]]; then
+                "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
+            else
+                echo "Error: Neither Docker Compose nor Docker binary is available. Cannot bring up services." >&2
+                return 1
+            fi
+            ;;
+    esac
 }
 
 
