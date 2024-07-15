@@ -5,10 +5,11 @@ DOCKER_BINARY="${DOCKER_BINARY:-$(which 'docker')}"
 CACHE_LOCATION=/tmp
 TAG=""
 DEBUG=""
-CURRENT_VERSION=0.0.6
+CURRENT_VERSION=0.0.7
 LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/hotio/pullio/releases" | jq -r .[0].tag_name)
-
+PARALLEL=1
 COMPOSE_TYPE="NONE"
+
 # Check for V1
 if [[ -n "${COMPOSE_BINARY}" ]]; then
     COMPOSE_TYPE="V1"
@@ -25,60 +26,75 @@ while [ "$1" != "" ]; do
         VALUE=$1
     fi
     case $PARAM in
-        --tag)
-            [[ -n $VALUE ]] && [[ $VALUE != "--"* ]] && TAG=".$VALUE"
-            ;;
-        --debug)
-            [[ $VALUE != "--"* ]] && DEBUG="${VALUE:-debug}"
-            ;;
+    --tag)
+        [[ -n $VALUE ]] && [[ $VALUE != "--"* ]] && TAG=".$VALUE"
+        ;;
+    --debug)
+        [[ $VALUE != "--"* ]] && DEBUG="${VALUE:-debug}"
+        ;;
+    --parallel)
+        [[ $VALUE =~ ^[0-9]+$ ]] && PARALLEL=$VALUE
+        ;;
     esac
     shift
 done
 
-echo "Running with \"DEBUG=$DEBUG\" and \"TAG=$TAG\"."
+echo "Running with \"DEBUG=$DEBUG\", \"TAG=$TAG\", and \"PARALLEL=$PARALLEL\"."
 echo "Current version: ${CURRENT_VERSION}"
 echo "Latest version: ${LATEST_VERSION}"
+
+# Setups the environment variables
+setup_environment() {
+    # Always export these variables
+    export COMPOSE_BINARY DOCKER_BINARY CACHE_LOCATION TAG DEBUG COMPOSE_TYPE
+
+    # Export functions and additional variables only for parallel execution
+    if [ "$PARALLEL" -gt 1 ]; then
+        export -f process_container compose_pull_wrapper compose_up_wrapper
+        export -f send_discord_notification send_generic_webhook export_env_vars
+        export sum
+    fi
+}
 
 compose_pull_wrapper() {
     cd "$1" || exit 1
     case $COMPOSE_TYPE in
-        "V1")
-            "${COMPOSE_BINARY}" pull "$2"
-            ;;
-        "V2")
-            "${DOCKER_BINARY}" compose pull "$2"
-            ;;
-        "NONE")
-            if [[ -n "${DOCKER_BINARY}" ]]; then
-                "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
-            else
-                echo "Error: Neither Docker Compose nor Docker binary is available. Cannot pull." >&2
-                return 1
-            fi
-            ;;
+    "V1")
+        "${COMPOSE_BINARY}" pull "$2"
+        ;;
+    "V2")
+        "${DOCKER_BINARY}" compose pull "$2"
+        ;;
+    "NONE")
+        if [[ -n "${DOCKER_BINARY}" ]]; then
+            "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose pull "$2"
+        else
+            echo "Error: Neither Docker Compose nor Docker binary is available. Cannot pull." >&2
+            return 1
+        fi
+        ;;
     esac
 }
 
 compose_up_wrapper() {
     cd "$1" || exit 1
     case $COMPOSE_TYPE in
-        "V1")
-            "${COMPOSE_BINARY}" up -d --always-recreate-deps "$2"
-            ;;
-        "V2")
-            "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
-            ;;
-        "NONE")
-            if [[ -n "${DOCKER_BINARY}" ]]; then
-                "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
-            else
-                echo "Error: Neither Docker Compose nor Docker binary is available. Cannot bring up services." >&2
-                return 1
-            fi
-            ;;
+    "V1")
+        "${COMPOSE_BINARY}" up -d --always-recreate-deps "$2"
+        ;;
+    "V2")
+        "${DOCKER_BINARY}" compose up -d --always-recreate-deps "$2"
+        ;;
+    "NONE")
+        if [[ -n "${DOCKER_BINARY}" ]]; then
+            "${DOCKER_BINARY}" run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$1:$1" -w="$1" linuxserver/docker-compose up -d --always-recreate-deps "$2"
+        else
+            echo "Error: Neither Docker Compose nor Docker binary is available. Cannot bring up services." >&2
+            return 1
+        fi
+        ;;
     esac
 }
-
 
 send_discord_notification() {
     if [[ "${LATEST_VERSION}" != "${CURRENT_VERSION}" ]]; then
@@ -167,12 +183,8 @@ export_env_vars() {
     export PULLIO_AUTHOR_URL=${13}
 }
 
-sum="$(sha1sum "$0" | awk '{print $1}')"
-
-mapfile -t containers < <("${DOCKER_BINARY}" ps --format '{{.Names}}' | sort -k1 | awk '{ print $1 }')
-
-for i in "${!containers[@]}"; do
-    IFS=" " read -r container_name <<< "${containers[i]}"
+process_container() {
+    local container_name="$1"
     echo "$container_name: Checking..."
 
     image_name=$("${DOCKER_BINARY}" inspect --format='{{.Config.Image}}' "$container_name")
@@ -195,10 +207,10 @@ for i in "${!containers[@]}"; do
     pullio_author_avatar=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.author.avatar" }}' "$container_name")
     pullio_author_url=$("${DOCKER_BINARY}" inspect --format='{{ index .Config.Labels "org.hotio.pullio'"${TAG}"'.author.url" }}' "$container_name")
 
-    if [[ ( -n $docker_compose_version ) && ( $pullio_update == true || $pullio_notify == true ) ]]; then
+    if [[ (-n $docker_compose_version) && ($pullio_update == true || $pullio_notify == true) ]]; then
         if [[ -f $pullio_registry_authfile ]]; then
             echo "$container_name: Registry login..."
-            jq -r .password < "$pullio_registry_authfile" | "${DOCKER_BINARY}" login --username "$(jq -r .username < "$pullio_registry_authfile")" --password-stdin "$(jq -r .registry < "$pullio_registry_authfile")"
+            jq -r .password <"$pullio_registry_authfile" | "${DOCKER_BINARY}" login --username "$(jq -r .username <"$pullio_registry_authfile")" --password-stdin "$(jq -r .registry <"$pullio_registry_authfile")"
         fi
 
         echo "$container_name: Pulling image..."
@@ -227,17 +239,17 @@ for i in "${!containers[@]}"; do
                 status_generic="update_success"
                 color=3066993
             else
-                echo "$container_name: Updating container failed!"
+                echo "${container_name}: Updating container failed!"
                 status="I tried to update myself.\nIt didn't work out, I might need some help."
                 status_generic="update_failure"
                 color=15158332
             fi
-            rm -f "$CACHE_LOCATION/$sum-$container_name.notified"
+            rm -f "${CACHE_LOCATION}/${sum}-${container_name}.notified"
         fi
 
         if [[ "${image_digest}" != "$container_image_digest" ]] && [[ $pullio_notify == true ]]; then
-            touch "$CACHE_LOCATION/$sum-$container_name.notified"
-            notified_digest=$(cat "$CACHE_LOCATION/$sum-$container_name.notified")
+            touch "${CACHE_LOCATION}/${sum}-${container_name}.notified"
+            notified_digest=$(cat "${CACHE_LOCATION}/${sum}-${container_name}.notified")
             if [[ $notified_digest != "$image_digest" ]]; then
                 if [[ -n "${pullio_script_notify[*]}" ]]; then
                     echo "$container_name: Executing notify script..."
@@ -252,11 +264,30 @@ for i in "${!containers[@]}"; do
                     echo "$container_name: Sending generic webhook..."
                     send_generic_webhook "$status_generic" "$container_name" "$old_opencontainers_image_version" "$new_opencontainers_image_version" "$image_name" "$pullio_generic_webhook" "$old_opencontainers_image_revision" "$new_opencontainers_image_revision" "${container_image_digest/sha256:/}" "${image_digest/sha256:/}" "$pullio_author_avatar" "$pullio_author_url"
                 fi
-                echo "$image_digest" > "$CACHE_LOCATION/$sum-$container_name.notified"
+                echo "$image_digest" >"${CACHE_LOCATION}/${sum}-${container_name}.notified"
             fi
         fi
     fi
-done
+}
+
+# Respect ctrl+c
+trap 'exit 130' INT
+
+# Setup the environment
+sum="$(sha1sum "$0" | awk '{print $1}')"
+declare -a containers
+readarray -t containers < <("${DOCKER_BINARY}" ps --format '{{.Names}}' | sort -k1)
+setup_environment
+
+echo "Processing ${#containers[@]} containers with parallelism of $PARALLEL"
+
+if [ "$PARALLEL" -gt 1 ]; then
+    printf '%s\n' "${containers[@]}" | xargs -P "$PARALLEL" -I {} bash -c 'process_container "$@"' _ {}
+else
+    for container_name in "${containers[@]}"; do
+        process_container "$container_name"
+    done
+fi
 
 echo "Pruning docker images..."
 "${DOCKER_BINARY}" image prune --force
