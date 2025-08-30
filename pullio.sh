@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 COMPOSE_BINARY="${COMPOSE_BINARY:-$(which 'docker-compose')}"
 DOCKER_BINARY="${DOCKER_BINARY:-$(which 'docker')}"
