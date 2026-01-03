@@ -5,8 +5,6 @@ DOCKER_BINARY="${DOCKER_BINARY:-$(which 'docker')}"
 CACHE_LOCATION=/tmp
 TAG=""
 DEBUG=""
-CURRENT_VERSION=0.0.9
-LATEST_VERSION=$(curl -fsSL "https://api.github.com/repos/hotio/pullio/releases" | jq -r .[0].tag_name)
 PARALLEL=1
 COMPOSE_TYPE="NONE"
 
@@ -40,8 +38,6 @@ while [ "$1" != "" ]; do
 done
 
 echo "Running with \"DEBUG=$DEBUG\", \"TAG=$TAG\", and \"PARALLEL=$PARALLEL\"."
-echo "Current version: ${CURRENT_VERSION}"
-echo "Latest version: ${LATEST_VERSION}"
 
 # Setups the environment variables
 setup_environment() {
@@ -97,11 +93,7 @@ compose_up_wrapper() {
 }
 
 send_discord_notification() {
-    if [[ "${LATEST_VERSION}" != "${CURRENT_VERSION}" ]]; then
-        footer_text="Powered by Pullio (update available)"
-    else
-        footer_text="Powered by Pullio"
-    fi
+    footer_text="Powered by Pullio"
     extra=""
     if [[ -n $3 ]] && [[ -n $4 ]] && [[ -n $7 ]] && [[ -n $8 ]]; then
         v_ind=">" && [[ ${3} == "${4}" ]] && v_ind="="
